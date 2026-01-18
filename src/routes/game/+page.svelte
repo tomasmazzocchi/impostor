@@ -30,22 +30,52 @@
 	let currentViewingPlayerId: string | null = null;
 	let viewedPlayers: Set<string> = new Set();
 
-	const sampleCategories: Category[] = [
-		{ id: '1', name: 'Animals', description: 'Different types of animals' },
-		{ id: '2', name: 'Food', description: 'Various food items' },
-		{ id: '3', name: 'Countries', description: 'Countries around the world' }
-	];
+	let sampleCategories: Category[] = [];
+	let sampleWords: Word[] = [];
+	let loading = true;
+	let error: string | null = null;
 
-	const sampleWords: Word[] = [
-		{ id: '1', word: 'Dog', categoryId: '1' },
-		{ id: '2', word: 'Cat', categoryId: '1' },
-		{ id: '3', word: 'Elephant', categoryId: '1' },
-		{ id: '4', word: 'Lion', categoryId: '1' },
-		{ id: '5', word: 'Pizza', categoryId: '2' },
-		{ id: '6', word: 'Burger', categoryId: '2' },
-		{ id: '7', word: 'Pasta', categoryId: '2' },
-		{ id: '8', word: 'Sushi', categoryId: '2' }
-	];
+	async function loadGameData() {
+		try {
+			loading = true;
+			error = null;
+
+			// Fetch categories and words in parallel
+			const [categoriesResponse, wordsResponse] = await Promise.all([
+				fetch('/api/categories'),
+				fetch('/api/words')
+			]);
+
+			if (!categoriesResponse.ok) {
+				throw new Error('Failed to load categories');
+			}
+			if (!wordsResponse.ok) {
+				throw new Error('Failed to load words');
+			}
+
+			const categoriesData = await categoriesResponse.json();
+			const wordsData = await wordsResponse.json();
+
+			// Transform categories to match expected format
+			sampleCategories = categoriesData.categories.map((cat: any) => ({
+				id: cat.id,
+				name: cat.name,
+				description: cat.description || undefined
+			}));
+
+			// Words are already in the correct format from the API
+			sampleWords = wordsData.words || [];
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to load game data';
+			console.error('Error loading game data:', err);
+		} finally {
+			loading = false;
+		}
+	}
+
+	onMount(() => {
+		loadGameData();
+	});
 
 	function handleAddPlayer() {
 		if (playerNameInput.trim()) {
@@ -126,7 +156,17 @@
 </script>
 
 <div class="game-container">
-	{#if gameState.phase === 'setup'}
+	{#if loading}
+		<div class="loading-screen">
+			<p>Loading game data...</p>
+		</div>
+	{:else if error}
+		<div class="error-screen">
+			<h2>Error loading game data</h2>
+			<p>{error}</p>
+			<button on:click={loadGameData}>Retry</button>
+		</div>
+	{:else if gameState.phase === 'setup'}
 		<SetupScreen
 			{gameState}
 			{sampleCategories}
@@ -184,5 +224,35 @@
 		padding: 2rem;
 		max-width: 1200px;
 		margin: 0 auto;
+	}
+
+	.loading-screen,
+	.error-screen {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 50vh;
+		gap: 1rem;
+		text-align: center;
+	}
+
+	.error-screen h2 {
+		color: #dc3545;
+		margin: 0;
+	}
+
+	.error-screen button {
+		padding: 0.75rem 1.5rem;
+		background: #007bff;
+		color: white;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		font-size: 1rem;
+	}
+
+	.error-screen button:hover {
+		background: #0056b3;
 	}
 </style>
