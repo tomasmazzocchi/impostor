@@ -13,6 +13,13 @@
   let previouslyRecordedWinner: 'impostor' | 'players' | null = null;
   let lastRoundNumber = 0;
   let players = gameState.players.map(player => ({ ...player, viewed: false }));
+  
+  // Questionnaire state
+  let impostorExpelled: boolean | null = null;
+  let expellers: Set<string> = new Set();
+  let roundsSurvived: number | null = null;
+  let impostorGuessedWord: boolean | null = null;
+  let currentQuestionIndex = 0;
 
   // Reset when starting a new round (round number changes)
   $: if (gameState.roundNumber !== lastRoundNumber) {
@@ -20,6 +27,11 @@
     showRoundResults = false;
     selectedWinner = null;
     previouslyRecordedWinner = null;
+    impostorExpelled = null;
+    expellers = new Set();
+    roundsSurvived = null;
+    impostorGuessedWord = null;
+    currentQuestionIndex = 0;
   }
 
   function handleViewPlayer(playerId: string) {
@@ -91,6 +103,63 @@
     return regularPlayer?.word || null;
   }
 
+  function handleImpostorExpelledSelected(expelled: boolean) {
+    impostorExpelled = expelled;
+  }
+
+  function toggleExpeller(playerId: string) {
+    const newExpellers = new Set(expellers);
+    if (newExpellers.has(playerId)) {
+      newExpellers.delete(playerId);
+    } else {
+      newExpellers.add(playerId);
+    }
+    expellers = newExpellers;
+  }
+
+  function handleRoundsSurvivedInput(value: string) {
+    const num = parseInt(value, 10);
+    roundsSurvived = isNaN(num) ? null : num;
+  }
+
+  function handleImpostorGuessedWord(guessed: boolean) {
+    impostorGuessedWord = guessed;
+  }
+
+  function goToPreviousQuestion() {
+    if (currentQuestionIndex > 0) {
+      currentQuestionIndex--;
+    }
+  }
+
+  function goToNextQuestion() {
+    currentQuestionIndex++;
+  }
+
+  // Reactive declarations - these recalculate automatically when dependencies change
+  $: canGoToNextQuestion = (() => {
+    if (currentQuestionIndex === 0) return impostorExpelled === true;
+    if (currentQuestionIndex === 1) return expellers.size > 0;
+    if (currentQuestionIndex === 2) return roundsSurvived !== null;
+    if (currentQuestionIndex === 3) return impostorGuessedWord !== null;
+    return false;
+  })();
+
+  $: shouldShowNextButton = (() => {
+    if (currentQuestionIndex === 0 && impostorExpelled === false) return false;
+    if (currentQuestionIndex === 3) return false;
+    if (impostorExpelled === false) return false;
+    return true;
+  })();
+
+  $: isAllQuestionsAnswered = (() => {
+    if (impostorExpelled === false) return true;
+    if (impostorExpelled === true) {
+      return expellers.size > 0 && roundsSurvived !== null && impostorGuessedWord !== null;
+    }
+    return false;
+  })();
+
   const impostor = getImpostor(gameState);
 </script>
 
@@ -105,52 +174,166 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-6 w-full">
-      {#each players as player}
-        <div class="bg-white border-2 rounded-xl p-6 text-center shadow {player.role === 'impostor' ? 'border-danger bg-red-50' : 'border-gray-border'}">
-          <h3 class="mb-2 text-xl text-gray-800">{player.name}</h3>
-          <p class="mt-2 text-lg text-gray-text font-bold">Score: {player.score}</p>
-          {#if player.role === 'impostor'}
-            <span class="inline-block bg-danger text-white px-4 py-2 rounded-full text-sm font-bold mt-2">IMPOSTOR</span>
+    {#if currentQuestionIndex === 0}
+      <!-- Question 1: Was the impostor expelled? -->
+      <div class="w-full text-center p-8 bg-gray-light rounded-xl">
+        <h2 class="mb-6 text-3xl text-gray-800">Was the impostor expelled?</h2>
+        <div class="flex gap-4 justify-center flex-wrap">
+          <button
+            class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {impostorExpelled === true ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
+            on:click={() => handleImpostorExpelledSelected(true)}
+          >
+            Yes
+          </button>
+          <button
+            class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {impostorExpelled === false ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
+            on:click={() => handleImpostorExpelledSelected(false)}
+          >
+            No
+          </button>
+        </div>
+        
+        <!-- Navigation buttons -->
+        <div class="flex gap-4 justify-center mt-6">
+          {#if shouldShowNextButton}
+            <button
+              class="px-6 py-3 text-lg bg-primary text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              disabled={!canGoToNextQuestion}
+              on:click={goToNextQuestion}
+            >
+              Next →
+            </button>
           {/if}
         </div>
-      {/each}
-    </div>
-
-    <div class="w-full text-center p-8 bg-gray-light rounded-xl">
-      <h2 class="mb-6 text-3xl text-gray-800">Who won this round?</h2>
-      <div class="flex gap-4 justify-center flex-wrap">
-        <button
-          class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {selectedWinner === 'impostor' ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
-          on:click={() => handleWinnerSelected('impostor')}
-        >
-          Impostor
-        </button>
-        <button
-          class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {selectedWinner === 'players' ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
-          on:click={() => handleWinnerSelected('players')}
-        >
-          Regular Players
-        </button>
       </div>
-    </div>
+    {:else if currentQuestionIndex === 1 && impostorExpelled === true}
+      <!-- Question 2: Who expelled the impostor? -->
+      <div class="w-full text-center p-8 bg-gray-light rounded-xl">
+        <h2 class="mb-6 text-3xl text-gray-800">Who expelled the impostor?</h2>
+        <p class="mb-6 text-lg text-gray-text">Select all players who voted to expel the impostor</p>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-6 w-full mt-4">
+          {#each gameState.players as player}
+            <button
+              class="bg-white border-4 rounded-xl p-6 text-center shadow cursor-pointer transition-all {expellers.has(player.id) ? 'border-primary bg-blue-50' : 'border-gray-border hover:border-primary hover:bg-blue-50'}"
+              on:click={() => toggleExpeller(player.id)}
+            >
+              <h3 class="mb-2 text-xl text-gray-800">{player.name}</h3>
+              {#if player.role === 'impostor'}
+                <span class="inline-block bg-danger text-white px-4 py-2 rounded-full text-sm font-bold mt-2">IMPOSTOR</span>
+              {/if}
+              {#if expellers.has(player.id)}
+                <div class="mt-4 text-primary text-2xl">✓</div>
+              {/if}
+            </button>
+          {/each}
+        </div>
+        {#if expellers.size === 0}
+          <p class="mt-4 text-lg text-gray-text">Select at least one player to continue</p>
+        {/if}
+        
+        <!-- Navigation buttons -->
+        <div class="flex gap-4 justify-center mt-6">
+          <button
+            class="px-6 py-3 text-lg bg-gray-600 text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-gray-700"
+            on:click={goToPreviousQuestion}
+          >
+            ← Back
+          </button>
+          {#if shouldShowNextButton}
+            <button
+              class="px-6 py-3 text-lg bg-primary text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              disabled={!canGoToNextQuestion}
+              on:click={goToNextQuestion}
+            >
+              Next →
+            </button>
+          {/if}
+        </div>
+      </div>
+    {:else if currentQuestionIndex === 2 && impostorExpelled === true}
+      <!-- Question 3: How many rounds did the impostor survive? -->
+      <div class="w-full text-center p-8 bg-gray-light rounded-xl">
+        <h2 class="mb-6 text-3xl text-gray-800">How many rounds did the impostor survive?</h2>
+        <div class="flex flex-col items-center gap-4">
+          <input
+            type="number"
+            min="0"
+            class="px-6 py-4 text-2xl text-center border-4 border-primary rounded-lg w-32 focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="0"
+            on:input={(e) => handleRoundsSurvivedInput(e.currentTarget.value)}
+            value={roundsSurvived ?? ''}
+          />
+        </div>
+        
+        <!-- Navigation buttons -->
+        <div class="flex gap-4 justify-center mt-6">
+          <button
+            class="px-6 py-3 text-lg bg-gray-600 text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-gray-700"
+            on:click={goToPreviousQuestion}
+          >
+            ← Back
+          </button>
+          {#if shouldShowNextButton}
+            <button
+              class="px-6 py-3 text-lg bg-primary text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              disabled={!canGoToNextQuestion}
+              on:click={goToNextQuestion}
+            >
+              Next →
+            </button>
+          {/if}
+        </div>
+      </div>
+    {:else if currentQuestionIndex === 3 && impostorExpelled === true}
+      <!-- Question 4: Did the impostor guess the word? -->
+      <div class="w-full text-center p-8 bg-gray-light rounded-xl">
+        <h2 class="mb-6 text-3xl text-gray-800">Did the impostor guess the word?</h2>
+        <div class="flex gap-4 justify-center flex-wrap">
+          <button
+            class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {impostorGuessedWord === true ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
+            on:click={() => handleImpostorGuessedWord(true)}
+          >
+            Yes
+          </button>
+          <button
+            class="px-8 py-4 text-xl border-4 rounded-lg cursor-pointer transition-all font-bold {impostorGuessedWord === false ? 'bg-primary text-white border-primary' : 'bg-white text-black border-gray-border hover:border-primary hover:bg-blue-50'}"
+            on:click={() => handleImpostorGuessedWord(false)}
+          >
+            No
+          </button>
+        </div>
+        
+        <!-- Navigation buttons -->
+        <div class="flex gap-4 justify-center mt-6">
+          <button
+            class="px-6 py-3 text-lg bg-gray-600 text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-gray-700"
+            on:click={goToPreviousQuestion}
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+    {/if}
 
-    {#if selectedWinner}
+    <!-- Action buttons - always visible at the end -->
+    <div class="w-full border-t-2 border-gray-300 pt-6">
       <div class="flex gap-4 flex-wrap justify-center w-full">
         <button 
-          class="px-8 py-4 text-xl bg-success text-white border-none rounded-lg cursor-pointer font-bold"
+          class="px-8 py-4 text-xl bg-success text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          disabled={!isAllQuestionsAnswered}
           on:click={handleContinueToNextRound}
         >
           Continue to Next Round
         </button>
         <button 
-          class="px-8 py-4 text-xl bg-danger text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-red-700"
+          class="px-8 py-4 text-xl bg-danger text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          disabled={!isAllQuestionsAnswered}
           on:click={handleEndGame}
         >
           End Game & Show Rankings
         </button>
       </div>
-    {/if}
+    </div>
   </div>
 {:else}
   <div class="flex flex-col gap-8 items-center">
