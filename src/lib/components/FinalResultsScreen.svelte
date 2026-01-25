@@ -2,6 +2,7 @@
   import type { GameState } from "$lib/game/types";
   import { createEventDispatcher } from "svelte";
   import { getPlayersByScore } from "$lib/game/local-mode";
+  import StandingsTable from "./StandingsTable.svelte";
 
   export let gameState: GameState;
 
@@ -32,26 +33,8 @@
     {/if}
   </div>
 
-  <div class="w-full flex flex-col gap-4">
-    {#each rankedPlayers as player, index}
-      <div class="flex items-center gap-6 bg-white p-6 rounded-xl border-2 shadow {player.score === highestScore ? 'border-yellow-300 bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-lg' : 'border-gray-border'}">
-        <div class="text-3xl font-bold min-w-[60px] text-center">
-          {#if player.score === highestScore}
-            🥇
-          {:else if index === 1 && rankedPlayers[1].score !== highestScore}
-            🥈
-          {:else if index === 2 && rankedPlayers[2]?.score !== highestScore && rankedPlayers[1].score !== highestScore}
-            🥉
-          {:else}
-            #{index + 1}
-          {/if}
-        </div>
-        <div class="flex-1">
-          <h3 class="mb-1 text-2xl text-gray-800">{player.name}</h3>
-          <p class="text-lg text-gray-text font-bold">Score: {player.score}</p>
-        </div>
-      </div>
-    {/each}
+  <div class="w-full">
+    <StandingsTable {gameState} />
   </div>
 
   <button 

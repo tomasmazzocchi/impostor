@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { GameState } from "$lib/game/types";
   import { createEventDispatcher } from "svelte";
-  import { getPlayerById, getImpostor } from "$lib/game/local-mode";
+  import { getPlayerById, getImpostor, getPlayersByScore } from "$lib/game/local-mode";
+  import StandingsTable from "./StandingsTable.svelte";
 
   export let gameState: GameState;
   export let currentViewingPlayerId: string | null = null;
@@ -9,6 +10,7 @@
   const dispatch = createEventDispatcher();
   let cardVisible = false;
   let showRoundResults = false;
+  let showStandingsModal = false;
   let lastRoundNumber = 0;
   let players = gameState.players.map(player => ({ ...player, viewed: false }));
   
@@ -135,6 +137,14 @@
     impostorGuessedWord = guessed;
   }
 
+  function handleShowStandings() {
+    showStandingsModal = true;
+  }
+
+  function handleCloseStandings() {
+    showStandingsModal = false;
+  }
+
   function goToPreviousQuestion() {
     if (currentQuestionIndex > 0) {
       currentQuestionIndex--;
@@ -169,6 +179,10 @@
     }
     return false;
   })();
+
+  $: rankedPlayersForModal = getPlayersByScore(gameState);
+  $: highestScoreForModal = rankedPlayersForModal.length > 0 ? rankedPlayersForModal[0].score : 0;
+  $: topPlayersForModal = rankedPlayersForModal.filter((player) => player.score === highestScoreForModal);
 
   const impostor = getImpostor(gameState);
 </script>
@@ -287,24 +301,84 @@
 
     <!-- Action buttons - always visible at the end -->
     <div class="w-full border-t-2 border-gray-300 pt-6">
-      <div class="flex gap-4 flex-wrap justify-center w-full">
+      <div class="flex flex-col gap-4 items-center w-full">
         <button 
-          class="px-8 py-4 text-xl bg-success text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          disabled={!isAllQuestionsAnswered}
-          on:click={handleContinueToNextRound}
+          class="px-6 py-3 text-lg underline border-none rounded-lg cursor-pointer font-bold hover:bg-purple-700 flex items-center justify-center gap-2"
+          on:click={handleShowStandings}
         >
-          Continue to Next Round
+          <span>Show Standings</span>
+          <img src="/podium.png" class="w-5 h-5" alt="Podium" />
         </button>
-        <button 
-          class="px-8 py-4 text-xl bg-danger text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          disabled={!isAllQuestionsAnswered}
-          on:click={handleEndGame}
-        >
-          End Game
-        </button>
+        <div class="flex gap-4 flex-wrap justify-center w-full">
+          <button 
+            class="px-8 py-4 text-xl bg-success text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            disabled={!isAllQuestionsAnswered}
+            on:click={handleContinueToNextRound}
+          >
+            Continue to Next Round
+          </button>
+          <button 
+            class="px-8 py-4 text-xl bg-danger text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled={!isAllQuestionsAnswered}
+            on:click={handleEndGame}
+          >
+            End Game
+          </button>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Standings Modal -->
+  {#if showStandingsModal}
+    <div 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+      role="button"
+      tabindex="0"
+      on:click={handleCloseStandings}
+      on:keydown={(e) => e.key === 'Escape' && handleCloseStandings()}
+    >
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <div 
+        class="bg-white rounded-2xl p-8 max-w-[600px] w-full max-h-[80vh] overflow-y-auto shadow-2xl" 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="standings-title"
+        on:click={(e) => e.stopPropagation()}
+      >
+        <h2 id="standings-title" class="text-3xl font-bold text-center mb-6 text-gray-800">Current Standings</h2>
+        <span>These are the standings up to the previous round</span>
+        {#if highestScoreForModal > 0}
+          <div class="bg-gradient-to-br from-yellow-300 to-orange-400 p-6 rounded-2xl text-center w-full shadow-md mb-4">
+            {#if topPlayersForModal.length === 1}
+              <h3 class="text-2xl mb-1 text-gray-800">🏆 {topPlayersForModal[0].name} 🏆</h3>
+              <p class="text-lg text-gray-700 font-bold">{topPlayersForModal[0].score} points</p>
+            {:else}
+              <h3 class="text-2xl mb-1 text-gray-800">🏆 Leading 🏆</h3>
+              <div class="flex flex-wrap gap-2 justify-center my-2">
+                {#each topPlayersForModal as player}
+                  <div class="bg-white/30 px-3 py-1 rounded-full text-base font-bold">
+                    <span class="text-gray-800">{player.name}</span>
+                  </div>
+                {/each}
+              </div>
+              <p class="text-lg text-gray-700 font-bold">{highestScoreForModal} points</p>
+            {/if}
+          </div>
+        {/if}
+        
+        <StandingsTable {gameState} compact={true} />
+
+        <button
+          class="mt-6 w-full px-6 py-3 text-lg bg-primary text-white border-none rounded-lg cursor-pointer font-bold transition-colors hover:bg-blue-700"
+          on:click={handleCloseStandings}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  {/if}
 {:else}
   <div class="flex flex-col gap-8 items-center">
     <h1 class="text-center text-2xl">Private Reveal</h1>
