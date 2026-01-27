@@ -122,11 +122,11 @@
     <div class="w-full border-t-2 border-gray-300 pt-6">
       <div class="flex flex-col gap-4 items-center w-full">
         <button 
-          class="px-6 py-3 text-lg underline border-none rounded-lg cursor-pointer font-bold hover:bg-purple-700 flex items-center justify-center gap-2"
+          class="group px-6 py-3 text-lg underline border-none rounded-lg cursor-pointer font-bold hover:bg-purple-700 hover:text-white flex items-center justify-center gap-2"
           on:click={handleShowStandings}
         >
-          <span>Ver Posiciones</span>
-          <img src="/podium.png" class="w-5 h-5" alt="Podio" />
+          Ver Posiciones
+          <img src="/podium.png" class="w-5 h-5 group-hover:invert" alt="Podio" />
         </button>
         <div class="flex gap-4 flex-wrap justify-center w-full">
           <Button
@@ -161,7 +161,7 @@
     
     <StandingsTable {gameState} compact={true} />
 
-    <div class="mt-6">
+    <div class="mt-6 flex justify-center">
       <Button variant="primary" size="lg" on:click={handleCloseStandings}>
         Cerrar
       </Button>

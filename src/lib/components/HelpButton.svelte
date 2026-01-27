@@ -66,7 +66,7 @@
     </section>
   </div>
 
-  <div class="mt-6">
+  <div class="mt-6 flex justify-center">
     <Button variant="primary" size="lg" on:click={closeHelp}>
       ¡Entendido!
     </Button>
